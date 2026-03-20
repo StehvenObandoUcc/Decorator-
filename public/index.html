@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower Defense - Patrón Decorador Interactivo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 5px;
+        }
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: 800px 1fr;
+            gap: 20px;
+        }
+
+        .game-area {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        #gameCanvas {
+            width: 800px;
+            height: 600px;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 100%);
+            border-radius: 10px;
+            display: block;
+            cursor: crosshair;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .stats-box, .tower-box, .controls-box {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .box-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #ffd700;
+            text-align: center;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-weight: bold;
+        }
+
+        .stat-value {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .upgrade-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .upgrade-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.9em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .upgrade-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+
+        .upgrade-btn:active {
+            transform: translateY(0);
+        }
+
+        .upgrade-btn.fast { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .upgrade-btn.ice { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .upgrade-btn.shield { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .upgrade-btn.gold { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .upgrade-btn.reset { 
+            background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%); 
+            grid-column: span 2;
+        }
+
+        .tower-description {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.95em;
+            line-height: 1.6;
+            min-height: 80px;
+        }
+
+        .game-over-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .game-over-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .game-over-content h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        .game-over-content p {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+
+        .instructions {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,0,0,0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6b6b);
+            transition: width 0.3s ease;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .warning {
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏰 Tower Defense - Patrón Decorador</h1>
+            <p>¡Defiende tu torre de las oleadas de enemigos!</p>
+        </header>
+
+        <div class="game-layout">
+            <!-- Game Canvas -->
+            <div class="game-area">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+                <div class="instructions">
+                    La torre dispara automáticamente. Aplica mejoras (decoradores) para hacerla más poderosa.
+                </div>
+            </div>
+
+            <!-- Info Panel -->
+            <div class="info-panel">
+                <!-- Stats Box -->
+                <div class="stats-box">
+                    <div class="box-title">📊 Estadísticas</div>
+                    <div class="stat-row">
+                        <span class="stat-label">💰 Oro:</span>
+                        <span class="stat-value" id="gold">100</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">⭐ Puntuación:</span>
+                        <span class="stat-value" id="score">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">🌊 Oleada:</span>
+                        <span class="stat-value" id="wave">1</span>
+                    </div>
+                    <div class="stat-row" id="livesRow">
+                        <span class="stat-label">❤️ Vidas:</span>
+                        <span class="stat-value" id="lives">10</span>
+                    </div>
+                </div>
+
+                <!-- Tower Box -->
+                <div class="tower-box">
+                    <div class="box-title">🗼 Estado de la Torre</div>
+                    <div class="tower-description" id="towerDesc">
+                        <div><strong>Descripción:</strong> <span id="description">Base Tower</span></div>
+                        <div><strong>⚔️ Daño:</strong> <span id="damage">10</span></div>
+                        <div><strong>⚡ Velocidad:</strong> <span id="speed">1</span></div>
+                        <div><strong>✨ Poder:</strong> <span id="power">None</span></div>
+                    </div>
+                </div>
+
+                <!-- Controls Box -->
+                <div class="controls-box">
+                    <div class="box-title">🎮 Mejoras (Decoradores)</div>
+                    <div class="upgrade-grid">
+                        <button class="upgrade-btn fast" onclick="upgradeTower('fast')">
+                            🚀 Disparo Rápido
+                        </button>
+                        <button class="upgrade-btn ice" onclick="upgradeTower('ice')">
+                            ❄️ Aura de Hielo
+                        </button>
+                        <button class="upgrade-btn shield" onclick="upgradeTower('shield')">
+                            🛡️ Escudo
+                        </button>
+                        <button class="upgrade-btn gold" onclick="upgradeTower('gold')">
+                            💰 Gen. Oro
+                        </button>
+                        <button class="upgrade-btn reset" onclick="resetTower()">
+                            🔄 Reiniciar Torre
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div class="game-over-overlay" id="gameOverOverlay">
+        <div class="game-over-content">
+            <h2>¡GAME OVER!</h2>
+            <p>Puntuación Final: <span id="finalScore">0</span></p>
+            <p>Oleadas Sobrevividas: <span id="finalWave">0</span></p>
+            <button class="upgrade-btn reset" onclick="restartGame()">
+                🔄 Jugar de Nuevo
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = {
+            enemies: [],
+            projectiles: [],
+            gold: 0,
+            score: 0,
+            wave: 0,
+            lives: 0,
+            gameOver: false
+        };
+
+        // Fetch game state from backend
+        async function fetchGameState() {
+            try {
+                const response = await fetch('/api/game/state');
+                gameState = await response.json();
+                
+                // Update UI
+                document.getElementById('gold').textContent = gameState.gold;
+                document.getElementById('score').textContent = gameState.score;
+                document.getElementById('wave').textContent = gameState.wave;
+                document.getElementById('lives').textContent = gameState.lives;
+                
+                // Warning if low lives
+                const livesRow = document.getElementById('livesRow');
+                if (gameState.lives <= 3) {
+                    livesRow.classList.add('warning');
+                } else {
+                    livesRow.classList.remove('warning');
+                }
+                
+                // Check game over
+                if (gameState.gameOver && !document.getElementById('gameOverOverlay').style.display) {
+                    showGameOver();
+                }
+                
+                // Render game
+                renderGame();
+                
+            } catch (error) {
+                console.error('Error fetching game state:', error);
+            }
+        }
+
+        // Fetch tower status
+        async function fetchTowerStatus() {
+            try {
+                const response = await fetch('/api/tower/status');
+                const data = await response.json();
+                
+                document.getElementById('description').textContent = data.description;
+                document.getElementById('damage').textContent = data.damage;
+                document.getElementById('speed').textContent = data.speed;
+                document.getElementById('power').textContent = data.power;
+            } catch (error) {
+                console.error('Error fetching tower status:', error);
+            }
+        }
+
+        // Apply upgrade
+        async function upgradeTower(type) {
+            try {
+                await fetch(`/api/tower/upgrade/${type}`, { method: 'POST' });
+                await fetchTowerStatus();
+            } catch (error) {
+                console.error('Error applying upgrade:', error);
+            }
+        }
+
+        // Reset tower
+        async function resetTower() {
+            try {
+                await fetch('/api/tower/reset', { method: 'POST' });
+                await fetchTowerStatus();
+            } catch (error) {
+                console.error('Error resetting tower:', error);
+            }
+        }
+
+        // Render the game
+        function renderGame() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw ground
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, 500, 800, 100);
+            
+            // Draw grass
+            ctx.fillStyle = '#90EE90';
+            ctx.fillRect(0, 480, 800, 20);
+            
+            // Draw tower base
+            ctx.fillStyle = '#696969';
+            ctx.fillRect(50, 400, 100, 100);
+            
+            // Draw tower body
+            ctx.fillStyle = '#A0A0A0';
+            ctx.fillRect(70, 350, 60, 50);
+            
+            // Draw tower top
+            ctx.beginPath();
+            ctx.moveTo(70, 350);
+            ctx.lineTo(100, 320);
+            ctx.lineTo(130, 350);
+            ctx.closePath();
+            ctx.fillStyle = '#8B4513';
+            ctx.fill();
+            
+            // Draw tower icon
+            ctx.font = 'bold 30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('🗼', 100, 385);
+            
+            // Draw enemies
+            gameState.enemies.forEach(enemy => {
+                const enemyColors = {
+                    'basic': '#FF6B6B',
+                    'fast': '#4ECDC4',
+                    'tank': '#45B7D1'
+                };
+                
+                const color = enemyColors[enemy.type] || '#FF6B6B';
+                
+                // Enemy body
+                if (enemy.frozen) {
+                    ctx.fillStyle = '#00BFFF';
+                    ctx.strokeStyle = '#87CEEB';
+                    ctx.lineWidth = 3;
+                } else {
+                    ctx.fillStyle = color;
+                }
+                
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                if (enemy.frozen) {
+                    ctx.stroke();
+                }
+                
+                // Health bar
+                const healthPercent = enemy.health / enemy.maxHealth;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(enemy.x - 20, enemy.y - 25, 40, 5);
+                ctx.fillStyle = healthPercent > 0.5 ? '#00FF00' : '#FF0000';
+                ctx.fillRect(enemy.x - 20, enemy.y - 25, 40 * healthPercent, 5);
+                
+                // Enemy eyes
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(enemy.x - 5, enemy.y - 3, 3, 0, Math.PI * 2);
+                ctx.arc(enemy.x + 5, enemy.y - 3, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(enemy.x - 5, enemy.y - 3, 1.5, 0, Math.PI * 2);
+                ctx.arc(enemy.x + 5, enemy.y - 3, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Draw projectiles
+            ctx.fillStyle = '#FFD700';
+            gameState.projectiles.forEach(proj => {
+                ctx.beginPath();
+                ctx.arc(proj.x, proj.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Glow effect
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#FFD700';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function showGameOver() {
+            const overlay = document.getElementById('gameOverOverlay');
+            document.getElementById('finalScore').textContent = gameState.score;
+            document.getElementById('finalWave').textContent = gameState.wave;
+            overlay.style.display = 'flex';
+        }
+
+        // Restart the entire game
+        async function restartGame() {
+            try {
+                await fetch('/api/game/restart', { method: 'POST' });
+                location.reload();
+            } catch (error) {
+                console.error('Error restarting game:', error);
+                location.reload();
+            }
+        }
+
+        // Initialize
+        fetchTowerStatus();
+        fetchGameState();
+
+        // Update game state every 50ms (20 FPS)
+        setInterval(fetchGameState, 50);
+
+        // Update tower status every 2 seconds
+        setInterval(fetchTowerStatus, 2000);
+    </script>
+</body>
+</html>
